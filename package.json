@@ -1,0 +1,23 @@
+{
+  "name": "db-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MCP server that wraps local MySQL databases for AI querying",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.0",
+    "dotenv": "^17.4.1",
+    "mysql2": "^3.11.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
