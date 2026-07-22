@@ -1,11 +1,51 @@
 import { z } from "zod";
 import { connectionManager } from "../db/connectionManager.js";
 
-// Reject any query that contains write/DDL keywords
-const WRITE_PATTERN =
-  /\b(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|REPLACE|RENAME|GRANT|REVOKE|LOCK|UNLOCK|CALL|EXEC|EXECUTE|LOAD|IMPORT)\b/i;
+// Reject any query that contains disallowed write/DDL keywords.
+// `UPDATE` is allowed only in the dedicated update policy, not in the read policy.
+const DISALLOWED_WRITE_PATTERN =
+  /\b(INSERT|DELETE|DROP|TRUNCATE|ALTER|CREATE|REPLACE|RENAME|GRANT|REVOKE|LOCK|UNLOCK|CALL|EXEC|EXECUTE|LOAD|IMPORT)\b/i;
 
 const MAX_ROWS = 500;
+
+type QueryPolicy = "read" | "update";
+
+export function validateQueryPolicy(sql: string, mode: QueryPolicy): { ok: true } | { ok: false; error: string } {
+  const trimmed = sql.trim();
+
+  if (!trimmed) {
+    return {
+      ok: false,
+      error: "Error: Query cannot be empty.",
+    };
+  }
+
+  if (mode === "read") {
+    if (!/^(SELECT|WITH)\b/i.test(trimmed)) {
+      return {
+        ok: false,
+        error: "Error: Only SELECT (or WITH ... SELECT) queries are allowed.",
+      };
+    }
+  } else if (!/^UPDATE\b/i.test(trimmed)) {
+    return {
+      ok: false,
+      error: "Error: Only UPDATE queries are allowed.",
+    };
+  }
+
+  if (DISALLOWED_WRITE_PATTERN.test(trimmed)) {
+    return {
+      ok: false,
+      error:
+        mode === "read"
+          ? "Error: Query contains disallowed keyword(s). Only read-only SELECT queries are permitted."
+          : "Error: Query contains disallowed keyword(s). Only single-table UPDATE queries are permitted.",
+    };
+  }
+
+  return { ok: true };
+}
 
 export const executeQuerySchema = {
   connection_id: z
@@ -30,33 +70,21 @@ export async function executeQuery({
   database: string;
   sql: string;
 }) {
+  const validation = validateQueryPolicy(sql, "read");
+
+  if (!validation.ok) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: "text" as const,
+          text: validation.error,
+        },
+      ],
+    };
+  }
+
   const trimmed = sql.trim();
-
-  // Must start with SELECT or WITH (CTEs)
-  if (!/^(SELECT|WITH)\b/i.test(trimmed)) {
-    return {
-      isError: true,
-      content: [
-        {
-          type: "text" as const,
-          text: "Error: Only SELECT (or WITH ... SELECT) queries are allowed.",
-        },
-      ],
-    };
-  }
-
-  if (WRITE_PATTERN.test(trimmed)) {
-    return {
-      isError: true,
-      content: [
-        {
-          type: "text" as const,
-          text: "Error: Query contains disallowed keyword(s). Only read-only SELECT queries are permitted.",
-        },
-      ],
-    };
-  }
-
   const adapter = connectionManager.getAdapter(connection_id);
   const result = await adapter.query(trimmed, database);
 

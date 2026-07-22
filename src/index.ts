@@ -7,6 +7,7 @@ import { listDatabasesSchema, listDatabases } from "./tools/listDatabases.js";
 import { listTablesSchema, listTables } from "./tools/listTables.js";
 import { describeTableSchema, describeTable } from "./tools/describeTable.js";
 import { executeQuerySchema, executeQuery } from "./tools/executeQuery.js";
+import { updateQuerySchema, updateQuery } from "./tools/updateQuery.js";
 import { getSampleRowsSchema, getSampleRows } from "./tools/getSampleRows.js";
 
 // Load and validate connections.json on startup
@@ -50,6 +51,13 @@ server.tool(
   "Execute a read-only SELECT SQL query on a specific database connection and return the results. Only SELECT and WITH…SELECT queries are allowed — no writes.",
   executeQuerySchema,
   executeQuery
+);
+
+server.tool(
+  "update_query",
+  "Execute an UPDATE SQL query on a specific database connection. Only UPDATE statements are permitted; CREATE, ALTER, INSERT, DELETE, and other DDL/DML are blocked.",
+  updateQuerySchema,
+  updateQuery
 );
 
 server.tool(
